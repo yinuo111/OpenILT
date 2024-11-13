@@ -12,18 +12,18 @@ import pycommon.utils as common
 
 class Kernel:
     def __init__(self, basedir="./kernel", defocus=False, conjuncture=False, combo=False, device=DEVICE):
-        self._basedir = basedir
+        self._basedir = basedir#with _ is somehow similar to claim it to be private
         self._defocus = defocus
         self._conjuncture = conjuncture
         self._combo = combo
         self._device = device
 
-        self._kernels = torch.load(self._kernel_file(), map_location=device).permute(2, 0, 1)
+        self._kernels = torch.load(self._kernel_file(), map_location=device).permute(2, 0, 1)#将tensor的维度换位
         self._scales = torch.load(self._scale_file(), map_location=device)
 
         self._knx, self._kny = self._kernels.shape[:2]
 
-    @property
+    @property#with @ means use it like a property instead of a function which needs ()
     def kernels(self): 
         return self._kernels
         
@@ -59,11 +59,11 @@ def _maskFloat(mask, dose):
 
 def _kernelMult(kernel, maskFFT, kernelNum):
     # kernel: [24, 35, 35]
-    knx, kny = kernel.shape[-2:]
+    knx, kny = kernel.shape[-2:]#取后两个维度数值
     knxh, knyh = knx // 2, kny // 2
     output = None
     if kernel.device != maskFFT.device: 
-        kernel = kernel.to(maskFFT.device)
+        kernel = kernel.to(maskFFT.device)#指定gpu
     if maskFFT.shape[0] == 1: 
         output = torch.zeros([kernelNum, maskFFT.shape[-2], maskFFT.shape[-1]], dtype=maskFFT.dtype, device=maskFFT.device)
         output[:, :knxh+1, :knyh+1] = maskFFT[:, :knxh+1, :knyh+1] * kernel[:kernelNum, -(knxh+1):, -(knyh+1):]
@@ -71,7 +71,7 @@ def _kernelMult(kernel, maskFFT, kernelNum):
         output[:, -knxh:, :knyh+1] = maskFFT[:, -knxh:, :knyh+1] * kernel[:kernelNum, :knxh, -(knyh+1):]
         output[:, -knxh:, -knyh:] = maskFFT[:, -knxh:, -knyh:] * kernel[:kernelNum, :knxh, :knyh]
     else: 
-        maskFFT = torch.unsqueeze(maskFFT, 1)
+        maskFFT = torch.unsqueeze(maskFFT, 1)#进行升维度？？为啥else要升维度啊？？
         output = torch.zeros([maskFFT.shape[0], kernelNum, maskFFT.shape[-2], maskFFT.shape[-1]], dtype=maskFFT.dtype, device=maskFFT.device)
         output[:, :, :knxh+1, :knyh+1] = maskFFT[:, :, :knxh+1, :knyh+1] * kernel[None, :kernelNum, -(knxh+1):, -(knyh+1):]
         output[:, :, :knxh+1, -knyh:] = maskFFT[:, :, :knxh+1, -knyh:] * kernel[None, :kernelNum, -(knxh+1):, :knyh]
@@ -108,11 +108,13 @@ def _convMask(mask, dose, kernel, scale, kernelNum):
     return image
 
 class _LithoSim(torch.autograd.Function): 
-    @staticmethod
+    @staticmethod#标记表示不用实例化类就能运行函数
+    ##向前传递函数
     def forward(ctx, mask, dose, kernel, scale, kernelNum, kernelGradCT, scaleGradCT, kernelNumGradCT, kernelGrad, scaleGrad, kernelNumGrad): 
         ctx.saved = (mask, dose, kernel, scale, kernelNum, kernelGradCT, scaleGradCT, kernelNumGradCT, kernelGrad, scaleGrad, kernelNumGrad)
         return _convMask(mask, dose, kernel, scale, kernelNum)
     @staticmethod
+    #向后传递函数
     def backward(ctx, grad): 
         (mask, dose, kernel, scale, kernelNum, kernelGradCT, scaleGradCT, kernelNumGradCT, kernelGrad, scaleGrad, kernelNumGrad) = ctx.saved
         cpx0 = torch.mul(_convMask(mask, dose, kernelGradCT, scaleGradCT, kernelNumGradCT), grad)
@@ -185,3 +187,5 @@ if __name__ == "__main__":
     plt.subplot(1, 2, 2)
     plt.imshow(printed[0].detach().cpu().numpy())
     plt.show()
+
+    ##11.13 torch类似于numpy（可能是gpu版本？不知道明天再看看）
